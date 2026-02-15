@@ -1,0 +1,29 @@
+
+# --- Cœur de LangChain ---
+langchain==0.3.27
+langchain-community==0.3.31
+langchain-core==0.3.83
+langchain-text-splitters==0.3.11
+
+# --- Intelligence Artificielle (Local & Embeddings) ---
+langchain-ollama         # INDISPENSABLE pour Phi-3.5
+langchain-huggingface    # INDISPENSABLE pour les Embeddings
+sentence-transformers==5.1.2
+transformers==4.57.6
+torch==2.8.0
+
+# --- Base de données Vectorielle ---
+faiss-cpu==1.13.0
+
+# --- Manipulation de données ---
+pandas
+numpy==2.0.2
+
+# --- Utilitaires ---
+python-dotenv==1.2.1
+requests==2.32.5
+tqdm==4.67.2
+
+matplotlib
+seaborn
+

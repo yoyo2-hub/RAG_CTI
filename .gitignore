@@ -1,0 +1,7 @@
+venv/
+data/
+cleaned_data/
+darkgram_cti_final_granular.jsonl
+darkgram_cti_final.jsonl
+__pycache__/
+*.pyc
