@@ -1,22 +1,18 @@
 
 # --- Cœur de LangChain ---
-langchain==0.3.27
-langchain-community==0.3.31
-langchain-core==0.3.83
-langchain-text-splitters==0.3.11
-
+langchain>=0.3.0
+langchain-community>=0.3.0
+langchain-huggingface>=0.1.0  # INDISPENSABLE pour les Embeddings
+faiss-cpu>=1.7.4
+sentence-transformers>=2.2.0
+transformers>=4.30.0
+pandas>=2.0.0
+jq>=1.6.0
 # --- Intelligence Artificielle (Local & Embeddings) ---
-langchain-ollama         # INDISPENSABLE pour Phi-3.5
-langchain-huggingface    # INDISPENSABLE pour les Embeddings
-sentence-transformers==5.1.2
-transformers==4.57.6
+langchain-ollama         # INDISPENSABLE pour Phi-3.5  
 torch==2.8.0
 
-# --- Base de données Vectorielle ---
-faiss-cpu==1.13.0
-
 # --- Manipulation de données ---
-pandas
 numpy==2.0.2
 
 # --- Utilitaires ---
