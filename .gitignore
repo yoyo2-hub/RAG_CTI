@@ -1,6 +1,6 @@
 venv/
 data/
 cleaned_data/
-JSONL\dark_gram.jsonl
+JSONL\darkgram_cti.jsonl
 __pycache__/
 *.pyc
