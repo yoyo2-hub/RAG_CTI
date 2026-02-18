@@ -15,6 +15,7 @@ def get_llm():
         model="phi3.5",
         temperature=0.1,
         num_ctx=4096,
+        num_predict=700,    # Limite la réponse à 500 tokens max
     )
 
 
@@ -53,51 +54,129 @@ def is_relevant_question(question):
 # ══════════════════════════════════════════════
 
 # Seuil de pertinence : au-dessus = non pertinent
-RELEVANCE_THRESHOLD = 0.75
-
-
-def retrieve_with_context(vectorstore, query, k=10):
+RELEVANCE_THRESHOLD = 1.0
+def retrieve_with_context(vectorstore, query,
+                          original_query=None, k=10):
     """
-    Recherche en 2 étapes avec FILTRAGE par score.
+    Double recherche + récupération replies via docstore.
     """
-    # Étape 1 : Posts principaux
-    posts = vectorstore.similarity_search_with_score(
+    # Recherche 1 : query combinée
+    posts1 = vectorstore.similarity_search_with_score(
         query=query,
-        k=k,
+        k=k * 2,
         filter={"doc_type": "original_post"},
     )
 
-    results = []
-    seen = set()
+    # Recherche 2 : query originale
+    posts2 = []
+    if original_query and original_query != query:
+        posts2 = vectorstore.similarity_search_with_score(
+            query=original_query,
+            k=k * 2,
+            filter={"doc_type": "original_post"},
+        )
 
-    for doc, score in posts:
-        # FILTRAGE : ignorer les résultats non pertinents
+    # Fusionner et dédupliquer
+    best_scores = {}
+    best_docs = {}
+
+    for doc, score in posts1 + posts2:
         if score > RELEVANCE_THRESHOLD:
             continue
-
         post_id = doc.metadata.get("post_id", "")
+        if not post_id:
+            continue
+        if post_id not in best_scores or score < best_scores[post_id]:
+            best_scores[post_id] = score
+            best_docs[post_id] = doc
 
-        entry = {
+    sorted_ids = sorted(best_scores, key=best_scores.get)
+
+    results = []
+    for post_id in sorted_ids[:k]:
+        doc = best_docs[post_id]
+        score = best_scores[post_id]
+
+        # Replies via docstore (PAS via similarity_search)
+        replies = get_replies_for_post(
+            vectorstore, post_id, max_replies=5
+        )
+
+        results.append({
             "post": doc,
-            "score": float(score),
+            "score": score,
             "post_id": post_id,
-            "replies": [],
-        }
+            "replies": replies,
+        })
 
-        # Étape 2 : Replies de ce post
-        if post_id and post_id not in seen:
-            try:
-                replies = vectorstore.similarity_search(
-                    query=query,
-                    k=5,
-                    filter={"parent_post_id": str(post_id)},
-                )
-                entry["replies"] = replies
-            except Exception:
-                pass
-            seen.add(post_id)
+    return results
+def get_replies_for_post(vectorstore, post_id, max_replies=5):
+    """
+    Récupère les replies directement depuis le docstore.
+    Pas de similarity search, juste un filtre exact.
+    """
+    replies = []
+    for doc_id, doc in vectorstore.docstore._dict.items():
+        if doc.metadata.get("parent_post_id") == str(post_id):
+            replies.append(doc)
+            if len(replies) >= max_replies:
+                break
+    return replies
 
-        results.append(entry)
+
+def retrieve_with_context(vectorstore, query,
+                          original_query=None, k=10):
+    """
+    Double recherche + récupération replies via docstore.
+    """
+    # Recherche 1 : query combinée
+    posts1 = vectorstore.similarity_search_with_score(
+        query=query,
+        k=k * 2,
+        filter={"doc_type": "original_post"},
+    )
+
+    # Recherche 2 : query originale
+    posts2 = []
+    if original_query and original_query != query:
+        posts2 = vectorstore.similarity_search_with_score(
+            query=original_query,
+            k=k * 2,
+            filter={"doc_type": "original_post"},
+        )
+
+    # Fusionner et dédupliquer
+    best_scores = {}
+    best_docs = {}
+
+    for doc, score in posts1 + posts2:
+        if score > RELEVANCE_THRESHOLD:
+            continue
+        post_id = doc.metadata.get("post_id", "")
+        if not post_id:
+            continue
+        if post_id not in best_scores or score < best_scores[post_id]:
+            best_scores[post_id] = score
+            best_docs[post_id] = doc
+
+    sorted_ids = sorted(best_scores, key=best_scores.get)
+
+    results = []
+    for post_id in sorted_ids[:k]:
+        doc = best_docs[post_id]
+        score = best_scores[post_id]
+
+        # Replies via docstore (PAS via similarity_search)
+        replies = get_replies_for_post(
+            vectorstore, post_id, max_replies=5
+        )
+
+        results.append({
+            "post": doc,
+            "score": score,
+            "post_id": post_id,
+            "replies": replies,
+        })
 
     return results
 
@@ -155,47 +234,48 @@ def format_context(results, max_results=5):
 
 REWRITE_PROMPT = ChatPromptTemplate.from_messages([
     ("system",
-     "Tu es un analyste CTI. Reformule cette question en "
-     "requête optimisée pour la recherche dans une base de "
-     "posts Telegram cybercriminels. Ajoute des termes "
-     "techniques CTI. Max 25 mots. Réponds UNIQUEMENT "
-     "avec la requête reformulée, rien d'autre."),
+     "You are a CTI search query optimizer. "
+     "Rewrite the user question as a short search query "
+     "for a database of cybercriminal Telegram posts. "
+     "Rules:\n"
+     "- Maximum 15 words\n"
+     "- English only\n"
+     "- No explanation, no notes, no parentheses\n"
+     "- Only output the search query, nothing else"),
     ("human", "{question}")
 ])
 
 ANALYSIS_PROMPT = ChatPromptTemplate.from_messages([
-    ("system", """Tu es un analyste senior CTI.
-Analyse les données suivantes extraites de canaux
-Telegram cybercriminels (dataset DarkGram).
+    ("system", """You are a senior CTI analyst specialized in 
+monitoring cybercriminal Telegram channels (DarkGram dataset).
 
-DONNÉES RÉCUPÉRÉES :
+RETRIEVED DATA:
 {context}
 
-RÈGLES STRICTES :
-1. Base-toi UNIQUEMENT sur les données ci-dessus
-2. Ne JAMAIS inventer des informations absentes du contexte
-3. Cite les POST_ID et CHANNEL exacts dans tes sources
-4. Si le contexte dit "AUCUN RÉSULTAT PERTINENT",
-   réponds que tu n'as pas trouvé de données pertinentes
-5. Évalue la fiabilité :
-   - Posts avec replies interrogatives = probable spam/scam
-   - Posts avec views élevées + forwards = menace potentielle
-   - Score de pertinence < 0.3 = très pertinent
-   - Score de pertinence > 0.5 = peu pertinent
-6. Ne fais PAS d'analyse si les données sont insuffisantes
+STRICT RULES:
+1. Base your analysis ONLY on the data above
+2. NEVER invent information not in the context
+3. Cite exact POST_ID and CHANNEL in your sources
+4. If context says "NO RELEVANT RESULT", say so clearly
+5. Assess reliability:
+   - Posts with interrogative replies = probable spam/scam
+   - Posts with high views + forwards = real threat potential
+   - Score < 0.5 = highly relevant
+   - Score > 0.8 = weakly relevant
+6. Do NOT analyze if data is insufficient
 
-FORMAT :
-## Analyse
-[Ton analyse factuelle basée sur les données]
+FORMAT:
+## Threat Analysis
+[Your factual analysis based on the data]
 
-## Indicateurs de Menace (IOC)
-- [UNIQUEMENT ceux présents dans le contexte]
+## Indicators of Compromise (IOC)
+- [ONLY those present in the context]
 
 ## Sources
 - POST_ID: X | Channel: Y | Score: Z
 
-## Fiabilité Globale
-[Élevée/Moyenne/Faible] - [justification]"""),
+## Overall Reliability
+[High/Medium/Low] - [justification]"""),
     ("human", "{question}")
 ])
 
@@ -219,19 +299,19 @@ class CTIAgent:
     def analyze(self, question, k=10, verbose=True):
         """Pipeline RAG complet avec validation."""
 
-        # Vérification pertinence
+        # Vérification pertinence question
         if not is_relevant_question(question):
             msg = (
-                "⚠️ Cette question ne semble pas liée "
-                "à la Cyber Threat Intelligence.\n\n"
-                "Exemples de questions valides :\n"
+                "⚠️ This question does not seem related "
+                "to Cyber Threat Intelligence.\n\n"
+                "Examples of valid questions:\n"
                 "- What cracking tools are shared?\n"
                 "- Which channels sell stolen credentials?\n"
                 "- What cloud logs are available?\n"
                 "- Are there pirated software shared?"
             )
             if verbose:
-                print(f"\n⚠️ Question hors-sujet détectée")
+                print(f"\n⚠️ Off-topic question detected")
             return {
                 "question": question,
                 "rewritten": None,
@@ -242,16 +322,25 @@ class CTIAgent:
         # 1. Reformulation
         if verbose:
             print(f"\n🔍 Question : {question}")
-
-        rewritten = self.rewrite_chain.invoke(
+        raw_rewrite = self.rewrite_chain.invoke(
             {"question": question}
         )
+        rewritten = raw_rewrite.split("\n")[0].strip()
+        rewritten = re.sub(r'\(.*?\)', '', rewritten).strip()
+        rewritten = rewritten.strip('"').strip("'").strip()
+
+        # Combiner : question originale DEUX FOIS + reformulation
+        combined_query = f"{question} {question} {rewritten}"
+
         if verbose:
             print(f"🔄 Reformulée : {rewritten}")
 
-        # 2. Retrieval
+        # 2. Retrieval avec la requête combinée
         results = retrieve_with_context(
-            self.vectorstore, rewritten, k=k
+            self.vectorstore, 
+            query=combined_query,
+            original_query=question,
+            k=k,
         )
         if verbose:
             print(f"📦 {len(results)} résultats pertinents")
@@ -259,22 +348,22 @@ class CTIAgent:
         # Aucun résultat pertinent
         if not results:
             if verbose:
-                print("❌ Aucun résultat sous le seuil")
+                print("❌ No results under threshold")
             return {
                 "question": question,
                 "rewritten": rewritten,
                 "analysis": (
-                    "❌ Aucun résultat pertinent trouvé "
-                    "dans la base DarkGram.\n"
-                    "Les documents trouvés avaient un score "
-                    "de similarité trop faible "
-                    f"(seuil: {RELEVANCE_THRESHOLD})."
+                    "❌ No relevant results found "
+                    "in the DarkGram database.\n"
+                    "Retrieved documents had similarity scores "
+                    "too low "
+                    f"(threshold: {RELEVANCE_THRESHOLD})."
                 ),
                 "sources": [],
             }
 
         # 3. Formatage
-        context = format_context(results, max_results=5)
+        context = format_context(results, max_results=3)
         if verbose:
             print(f"📋 Contexte : {len(context)} car.")
 

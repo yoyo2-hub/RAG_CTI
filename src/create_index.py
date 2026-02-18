@@ -55,7 +55,7 @@ def load_index():
     """Charge un index existant."""
     if not FAISS_INDEX_PATH.exists():
         raise FileNotFoundError(
-            f"Index non trouvé : {FAISS_INDEX_PATH}"
+
         )
 
     embeddings = get_embedding_model()
