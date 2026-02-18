@@ -4,18 +4,18 @@ Agent CTI avec retrieval intelligent et Phi-3.5
 """
 
 import re
-from langchain_community.llms import Ollama
+from langchain_ollama import OllamaLLM
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
 
 def get_llm():
     """Phi-3.5 via Ollama."""
-    return Ollama(
+    return OllamaLLM(
         model="phi3.5",
         temperature=0.1,
         num_ctx=4096,
-        num_predict=700,    # Limite la réponse à 500 tokens max
+        num_predict=700,    # Limite la réponse à 700 tokens max
     )
 
 
@@ -37,6 +37,8 @@ def is_relevant_question(question):
         r'^what is the weather',
         r'^who are you',
         r'^what can you do',
+        r'^tell me a joke',
+        r'^(joke|funny|laugh)',
     ]
 
     for pattern in irrelevant_patterns:
