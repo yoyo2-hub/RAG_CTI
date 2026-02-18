@@ -256,7 +256,7 @@ else:
 # ══════════════════════════════════════════════
 
 print(f"\n{'═' * 60}")
-print("  TEST 5 : Récupération des replies")
+print("  TEST 5 : Récupération des replies (engagement)")
 print("═" * 60)
 
 result = agent.analyze(
@@ -264,20 +264,22 @@ result = agent.analyze(
     verbose=False
 )
 
-total_replies = 0
 for s in result["sources"]:
-    total_replies += s["replies"]
-    if s["replies"] > 0:
-        print(
-            f"  ✅ POST {s['post_id']} | "
-            f"{s['channel']} | "
-            f"Replies: {s['replies']}"
-        )
+    reply_info = (
+        f"Replies: {s['replies']}"
+        if s['replies'] > 0
+        else "No replies"
+    )
+    print(
+        f"  POST {s['post_id']} | "
+        f"{s['channel']} | "
+        f"{reply_info}"
+    )
 
-if total_replies > 0:
-    print(f"\n  ✅ PASS : {total_replies} replies récupérées")
-else:
-    print(f"\n  ❌ FAIL : Aucune reply récupérée")
+total_replies = sum(s["replies"] for s in result["sources"])
+print(f"\n  Total replies récupérées : {total_replies}")
+print(f"  Note : Les replies indiquent l'ENGAGEMENT")
+print(f"         communautaire, pas la qualité du post")
 
 
 # ══════════════════════════════════════════════

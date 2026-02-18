@@ -181,13 +181,13 @@ def retrieve_with_context(vectorstore, query,
     return results
 
 
-def format_context(results, max_results=5):
+def format_context(results, max_results=4):
     """
     Formate pour le prompt du LLM.
-    Reconstruit le contexte depuis metadata.
+    Qualifie les replies comme des RÉACTIONS communautaires.
     """
     if not results:
-        return "AUCUN RÉSULTAT PERTINENT TROUVÉ."
+        return "NO RELEVANT RESULT FOUND."
 
     blocks = []
 
@@ -213,15 +213,21 @@ def format_context(results, max_results=5):
                 f"Forwards: {forwards}]\n"
             )
 
+        # Replies = réactions communautaires
         if r["replies"]:
-            block += "  ── Réactions communauté ──\n"
+            block += (
+                f"  ── Community reactions "
+                f"({len(r['replies'])} replies) ──\n"
+            )
             for reply in r["replies"]:
                 r_meta = reply.metadata
                 r_id = r_meta.get("reply_id", "?")
                 block += (
-                    f"  → [REPLY_ID: {r_id}] "
+                    f"  → [REPLY {r_id}] "
                     f"{reply.page_content}\n"
                 )
+        else:
+            block += "  [No community replies]\n"
 
         blocks.append(block)
 
@@ -257,12 +263,16 @@ STRICT RULES:
 2. NEVER invent information not in the context
 3. Cite exact POST_ID and CHANNEL in your sources
 4. If context says "NO RELEVANT RESULT", say so clearly
-5. Assess reliability:
-   - Posts with interrogative replies = probable spam/scam
-   - Posts with high views + forwards = real threat potential
-   - Score < 0.5 = highly relevant
-   - Score > 0.8 = weakly relevant
+5. Assess reliability using these criteria:
+   - High views + high forwards = widely shared threat
+   - High views + zero forwards = possibly clickbait
+   - Many interrogative replies like "how to use?" or 
+     "what is this?" = audience does NOT understand the 
+     content, likely spam or scam
+   - Few or no replies does NOT mean low quality
+   - Replies are community REACTIONS, not answers
 6. Do NOT analyze if data is insufficient
+7. Keep your response concise and factual
 
 FORMAT:
 ## Threat Analysis
@@ -273,6 +283,9 @@ FORMAT:
 
 ## Sources
 - POST_ID: X | Channel: Y | Score: Z
+
+## Community Engagement
+- [What replies reveal about post credibility]
 
 ## Overall Reliability
 [High/Medium/Low] - [justification]"""),
