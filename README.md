@@ -2,7 +2,7 @@
 
 ## 🎯 Overview
 
-Multi-Agent CTI with RAG is a sophisticated system that combines **Retrieval-Augmented Generation (RAG)** with **multi-agent architecture** to provide intelligent Cyber Threat Intelligence analysis and insights. This system leverages LLMs and knowledge retrieval to deliver context-aware threat assessments and recommendations.
+Multi-Agent CTI with RAG is a complete system that combines **Retrieval-Augmented Generation (RAG)** with **multi-agent architecture** to provide intelligent Cyber Threat Intelligence analysis and insights. This system leverages LLMs and knowledge retrieval to deliver context-aware threat assessments and recommendations.
 
 ## ✨ Key Features
 
@@ -130,44 +130,14 @@ Run specific test:
 pytest tests/test_agents.py -v
 ```
 
-## 📚 Documentation
-
-For detailed documentation:
-- See `docs/` directory for comprehensive guides
-- API documentation available in `docs/api.md`
-- Architecture details in `docs/architecture.md`
-
-## 🤝 Contributing
-
-Contributions are welcome! Please follow these steps:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/improvement`)
-3. Make your changes
-4. Add tests for new functionality
-5. Submit a pull request
-
-## 📝 License
-
-This project is licensed under the MIT License - see the `LICENSE` file for details.
-
 ## 🔗 Related Resources
 
 - [Retrieval-Augmented Generation (RAG)](https://arxiv.org/abs/2005.11401)
 - [Multi-Agent Systems](https://en.wikipedia.org/wiki/Multi-agent_system)
 - [Cyber Threat Intelligence](https://www.mitre.org/about/cybersecurity-center)
 
-## 📧 Contact & Support
+## 👥 Contributors
+- Chayma Dallel
+- Emna Ghorbel
+- Ranim Bouguila
 
-- **Issues**: GitHub Issues for bug reports and feature requests
-- **Discussions**: Use GitHub Discussions for questions and ideas
-- **Email**: yoyo2-hub@example.com
-
-## ⭐ Acknowledgments
-
-- Inspired by advances in RAG and multi-agent architectures
-- Thanks to all contributors and the open-source community
-
----
-
-**Last Updated**: June 2026
